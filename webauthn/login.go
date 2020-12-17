@@ -66,6 +66,69 @@ func (webauthn *WebAuthn) BeginLogin(user User, opts ...LoginOption) (*protocol.
 	return &response, &newSessionData, nil
 }
 
+//mostly the same as BeginLogin
+func (webauthn *WebAuthn) BeginVerify(user User, opts ...LoginOption) (*protocol.CredentialAssertion, *SessionData, error) {
+	/*
+	challenge, err := protocol.CreateChallenge()
+	if err != nil {
+		return nil, nil, err
+	}
+	*/
+	challenge := []byte("This is a fixed challenge______.")
+
+	credentials := user.WebAuthnCredentials()
+
+	if len(credentials) == 0 { // If the user does not have any credentials, we cannot do login
+		return nil, nil, protocol.ErrBadRequest.WithDetails("Found no credentials for user")
+	}
+
+	var allowedCredentials = make([]protocol.CredentialDescriptor, len(credentials))
+
+	for i, credential := range credentials {
+		var credentialDescriptor protocol.CredentialDescriptor
+		credentialDescriptor.CredentialID = credential.ID
+		credentialDescriptor.Type = protocol.PublicKeyCredentialType
+		allowedCredentials[i] = credentialDescriptor
+	}
+
+	requestOptions := protocol.PublicKeyCredentialRequestOptions{
+		Challenge:          challenge,
+		Timeout:            webauthn.Config.Timeout,
+		RelyingPartyID:     webauthn.Config.RPID,
+		UserVerification:   webauthn.Config.AuthenticatorSelection.UserVerification,
+		AllowedCredentials: allowedCredentials,
+	}
+
+	for _, setter := range opts {
+		setter(&requestOptions)
+	}
+
+	newSessionData := SessionData{
+		Challenge:            base64.RawURLEncoding.EncodeToString(challenge),
+		UserID:               user.WebAuthnID(),
+		AllowedCredentialIDs: requestOptions.GetAllowedCredentialIDs(),
+		UserVerification:     requestOptions.UserVerification,
+	}
+
+	response := protocol.CredentialAssertion{requestOptions}
+
+	return &response, &newSessionData, nil
+}
+
+//mostly the same as FinishLogin
+// Take the response from the client and validate it against the user credentials and stored session data
+func (webauthn *WebAuthn) FinishVerify(user User, session SessionData, response *http.Request) (*Credential, string, error) {
+	parsedResponse, err := protocol.ParseCredentialRequestResponse(response)
+	if err != nil {
+		return nil, "", err
+	}
+	
+	veriData := session.Challenge
+	cred, err := webauthn.ValidateLogin(user, session, parsedResponse)
+	
+	return cred, veriData, err
+}
+
 // Updates the allowed credential list with Credential Descripiptors, discussed in §5.10.3
 // (https://www.w3.org/TR/webauthn/#dictdef-publickeycredentialdescriptor) with user-supplied values
 func WithAllowedCredentials(allowList []protocol.CredentialDescriptor) LoginOption {
