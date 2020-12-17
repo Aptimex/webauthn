@@ -67,14 +67,14 @@ func (webauthn *WebAuthn) BeginLogin(user User, opts ...LoginOption) (*protocol.
 }
 
 //mostly the same as BeginLogin
-func (webauthn *WebAuthn) BeginVerify(user User, opts ...LoginOption) (*protocol.CredentialAssertion, *SessionData, error) {
+func (webauthn *WebAuthn) BeginVerify(user User, data string, opts ...LoginOption) (*protocol.CredentialAssertion, *SessionData, error) {
 	/*
 	challenge, err := protocol.CreateChallenge()
 	if err != nil {
 		return nil, nil, err
 	}
 	*/
-	challenge := []byte("This is a fixed challenge______.")
+	challenge := []byte(data)
 
 	credentials := user.WebAuthnCredentials()
 
