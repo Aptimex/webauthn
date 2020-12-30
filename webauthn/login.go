@@ -117,16 +117,16 @@ func (webauthn *WebAuthn) BeginVerify(user User, data string, opts ...LoginOptio
 
 //mostly the same as FinishLogin
 // Take the response from the client and validate it against the user credentials and stored session data
-func (webauthn *WebAuthn) FinishVerify(user User, session SessionData, response *http.Request) (*Credential, string, error) {
+func (webauthn *WebAuthn) FinishVerify(user User, session SessionData, response *http.Request) (*Credential, string, *protocol.ParsedCredentialAssertionData, error) {
 	parsedResponse, err := protocol.ParseCredentialRequestResponse(response)
 	if err != nil {
-		return nil, "", err
+		return nil, "", nil, err
 	}
 	
 	veriData := session.Challenge
 	cred, err := webauthn.ValidateLogin(user, session, parsedResponse)
 	
-	return cred, veriData, err
+	return cred, veriData, parsedResponse, err
 }
 
 // Updates the allowed credential list with Credential Descripiptors, discussed in §5.10.3
