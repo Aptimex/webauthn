@@ -67,7 +67,7 @@ func (webauthn *WebAuthn) BeginLogin(user User, opts ...LoginOption) (*protocol.
 }
 
 //mostly the same as BeginLogin
-func (webauthn *WebAuthn) BeginVerify(user User, data string, opts ...LoginOption) (*protocol.CredentialAssertion, *SessionData, error) {
+func (webauthn *WebAuthn) BeginCast(user User, data string, opts ...LoginOption) (*protocol.CredentialAssertion, *SessionData, error) {
 	/*
 	challenge, err := protocol.CreateChallenge()
 	if err != nil {
@@ -113,6 +113,24 @@ func (webauthn *WebAuthn) BeginVerify(user User, data string, opts ...LoginOptio
 	response := protocol.CredentialAssertion{requestOptions}
 
 	return &response, &newSessionData, nil
+}
+
+//mostly the same as FinishLogin
+// Take the response from the client and validate it against the user credentials and stored session data
+func (webauthn *WebAuthn) FinishCast(user User, session SessionData, response *http.Request) (*Credential, string, *protocol.ParsedCredentialAssertionData, error) {
+	parsedResponse, err := protocol.ParseCredentialRequestResponse(response)
+	if err != nil {
+		return nil, "", nil, err
+	}
+	
+	veriData := session.Challenge
+	cred, err := webauthn.ValidateLogin(user, session, parsedResponse)
+	
+	return cred, veriData, parsedResponse, err
+}
+
+func (webauthn *WebAuthn) BeginVerify(user User, data string, opts ...LoginOption) (*protocol.CredentialAssertion, *SessionData, error) {
+	return webauthn.BeginCast(user, data, opts...)
 }
 
 //mostly the same as FinishLogin
