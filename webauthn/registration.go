@@ -44,7 +44,8 @@ func (webauthn *WebAuthn) BeginRegistration(user User, opts ...RegistrationOptio
 	rrk := false
 	authSelection := protocol.AuthenticatorSelection{
 		RequireResidentKey: &rrk,
-		UserVerification:   protocol.VerificationRequired,
+		//UserVerification:   protocol.VerificationPrefered
+		UserVerification:   protocol.VerificationRequired, //require verification for increased voter security
 	}
 
 	creationOptions := protocol.PublicKeyCredentialCreationOptions{

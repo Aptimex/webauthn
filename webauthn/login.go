@@ -66,16 +66,20 @@ func (webauthn *WebAuthn) BeginLogin(user User, opts ...LoginOption) (*protocol.
 	return &response, &newSessionData, nil
 }
 
-//mostly the same as BeginLogin
+//Same as BeginLogin() (standard WebAuthn implemenation), but takes an extra 'data' input and
+// uses that as the challenge instead of generating a random byte sequence. Allows for arbitrary
+// data to be signed by the HSK without modifying any of the CTAP2 (client to authenticator) code.
 func (webauthn *WebAuthn) BeginCast(user User, data string, opts ...LoginOption) (*protocol.CredentialAssertion, *SessionData, error) {
-	/*
+	/* This is the original challenge generation code being replaced
 	challenge, err := protocol.CreateChallenge()
 	if err != nil {
 		return nil, nil, err
 	}
 	*/
 	challenge := []byte(data)
-
+	
+	//Everything past here is just a copy of BeginLogin()
+	
 	credentials := user.WebAuthnCredentials()
 
 	if len(credentials) == 0 { // If the user does not have any credentials, we cannot do login
@@ -115,8 +119,8 @@ func (webauthn *WebAuthn) BeginCast(user User, data string, opts ...LoginOption)
 	return &response, &newSessionData, nil
 }
 
-//mostly the same as FinishLogin
-// Take the response from the client and validate it against the user credentials and stored session data
+//Same as FinishLogin() (standard WebAuthn implemenation), but also returns the challenge (ballot data)
+// and parsed HSK repsonse structure so that a verifiable ballot structure can be constructed with it.
 func (webauthn *WebAuthn) FinishCast(user User, session SessionData, response *http.Request) (*Credential, string, *protocol.ParsedCredentialAssertionData, error) {
 	parsedResponse, err := protocol.ParseCredentialRequestResponse(response)
 	if err != nil {
@@ -129,22 +133,17 @@ func (webauthn *WebAuthn) FinishCast(user User, session SessionData, response *h
 	return cred, veriData, parsedResponse, err
 }
 
+//Just calls BeginCast() because the first part of the Verify process is exactly the same on the backend.
+// Only difference is the source of 'data' and how the result is handled, which are both taken care of by
+// the caller.
 func (webauthn *WebAuthn) BeginVerify(user User, data string, opts ...LoginOption) (*protocol.CredentialAssertion, *SessionData, error) {
 	return webauthn.BeginCast(user, data, opts...)
 }
 
-//mostly the same as FinishLogin
-// Take the response from the client and validate it against the user credentials and stored session data
+//Just calls FinishCast() because the second part of the Verify process is exactly the same on the backend.
+// Only difference is how the result is handled, which is taken care of by the caller.
 func (webauthn *WebAuthn) FinishVerify(user User, session SessionData, response *http.Request) (*Credential, string, *protocol.ParsedCredentialAssertionData, error) {
-	parsedResponse, err := protocol.ParseCredentialRequestResponse(response)
-	if err != nil {
-		return nil, "", nil, err
-	}
-	
-	veriData := session.Challenge
-	cred, err := webauthn.ValidateLogin(user, session, parsedResponse)
-	
-	return cred, veriData, parsedResponse, err
+	return webauthn.FinishCast(user, session, response)
 }
 
 // Updates the allowed credential list with Credential Descripiptors, discussed in §5.10.3
