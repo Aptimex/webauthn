@@ -70,13 +70,13 @@ func (webauthn *WebAuthn) BeginLogin(user User, opts ...LoginOption) (*protocol.
 // uses that as the challenge instead of generating a random byte sequence. Allows for arbitrary
 // data to be signed by the HSK without modifying any of the CTAP2 (client to authenticator) code.
 func (webauthn *WebAuthn) BeginCast(user User, data string, opts ...LoginOption) (*protocol.CredentialAssertion, *SessionData, error) {
-	/* This is the original challenge generation code being replaced
-	challenge, err := protocol.CreateChallenge()
+	rand, err := protocol.CreateChallenge()
 	if err != nil {
 		return nil, nil, err
 	}
-	*/
-	challenge := []byte(data)
+	
+	//combine the ballot data and random challenge with a null-byte separator
+	challenge := append([]byte(data), append([]byte{0}, rand...)...)
 	
 	//Everything past here is just a copy of BeginLogin()
 	
@@ -127,10 +127,16 @@ func (webauthn *WebAuthn) FinishCast(user User, session SessionData, response *h
 		return nil, "", nil, err
 	}
 	
-	veriData := session.Challenge
+	//veriData := session.Challenge
+	veriData, err := base64.RawURLEncoding.DecodeString(session.Challenge)
+	if err != nil {
+		return nil, "", nil, err
+	}
+	
+	veriData = bytes.Split(veriData, []byte{0})[0] //separate the data from the random challenge
 	cred, err := webauthn.ValidateLogin(user, session, parsedResponse)
 	
-	return cred, veriData, parsedResponse, err
+	return cred, string(veriData), parsedResponse, err
 }
 
 //Just calls BeginCast() because the first part of the Verify process is exactly the same on the backend.
